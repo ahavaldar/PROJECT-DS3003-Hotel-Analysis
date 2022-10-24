@@ -1,0 +1,168 @@
+---
+title: "Final: What should you look for when booking a hotel?"
+author: "Akhil Havaldar (ash2sfp)"
+date: "Date: April 11"
+output:
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+runtime: shiny
+---
+<style>
+h1.title {
+  font-size: 30px;
+}
+h1 {
+  font-size: 26px;
+}
+h2 {
+  font-size: 22px;
+}
+h3 { 
+  font-size: 18px;
+}
+
+</style>
+
+# Article
+[Link](https://www.afar.com/magazine/best-time-to-book-a-hotel)
+
+- This article goes over questions you should ask yourself when trying to book a hotel. In order to get the best rates at the best times you have to good timing. Hotel rates vary drastically depending on how far out you book, what time of year you're traveling, what days of the week you plan on staying, etc. This article suggests you ask the following questions in order to get the best deal on your stay. First, what is the best day of the week to book? The article says Sunday for domestic travel, and Friday for international. Second, what is the cheapest day of the week to check in? Tuesday seems the best day for this. Third, how far in advance should you book? The closer to your check in date the better, since hotels tend to cut rates closer to check in dates. Fourth, what time of year should you avoid hotel stays? You should definitely avoid hotel stays during prime vacation and holiday season.
+
+# Data Description
+[Link](https://www.kaggle.com/datasets/jessemostipak/hotel-booking-demand)
+
+- This data set contains information regarding the booking data for city hotels and resort hotels. The variables within the data set match well to the questions I am trying to answer in the article. The data set contains information on check in month, which will help determine whether or not the majority of people book hotels in the prime vacation months. The data set also contains information on lead time, which is the amount of days in advance the hotel room was booked. This will help determine if people are taking advice of the article and booking close to their desired check in date. Lastly, I want to look at if there is a distinction in the average daily rate between resort hotels and city hotels, and the groups of vacation months.
+
+# Data Cleaning and Validation{.tabset}
+## Initial Cleaning
+- Since the data set contains almost 120,000 observations, I am removing all NAs in the data set. This brings the number of observations down from 119,390 to 119,386 (only 4 removed).
+```{r, warning=FALSE, message=FALSE}
+library(readr)
+library(dplyr)
+library(DT)
+# Reading in data
+hotel <- read_csv("hotel_bookings.csv")
+# Using count() to get number of observations
+count(hotel)
+```
+```{r, warning=FALSE, message=FALSE}
+hotel <- na.omit(hotel)
+count(hotel)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+```
+## Unique Levels - Month
+- Now we can look at the unique values for each variable.
+```{r}
+unique(hotel$arrival_date_month)
+```
+## Unique Levels - Hotel Type
+- Now we can look at the unique values for each variable.
+```{r}
+unique(hotel$hotel)
+```
+## Descriptive Statistics
+- We can look at the summary statistics for lead time and average daily rate. 
+```{r}
+# Using summary() to get the 5 number summary statistics
+summary(hotel$lead_time)
+summary(hotel$adr)
+```
+## Final Dataset
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+
+# Selecting variables of interest
+hotel2 <- hotel%>%
+  select(hotel, lead_time, arrival_date_month, adr)
+
+# Creating groups using factor collapse
+hotel2$group <- fct_collapse(hotel2$arrival_date_month, 
+                             Prime_Summer = c("June", "July", "August"), 
+                             Prime_Winter = c("November","December", "January"), 
+                             Not_Prime = c("February", "March",
+                                           "April", "May", 
+                                           "September", 
+                                           "October"))
+
+datatable(hotel2)
+```
+
+# Plots
+## Check In Month{.tabset}
+### Plot
+```{r}
+library(ggplot2)
+library(RColorBrewer)
+# Creating a shiny app for a bar graph
+
+shinyApp(
+  ui = fluidPage(
+  selectInput("s1", "Group:", choices=unique(hotel2$group), selected="Prime_Summer"),
+  plotOutput("monthct")
+  ),
+  
+  server = function(input, output){
+    output$monthct <- renderPlot({
+ggplot(hotel2[hotel2$group==input$s1,], aes(x=fct_inorder(arrival_date_month), fill=arrival_date_month))+
+                          geom_bar()+ labs(title = "Check In Month", x= "Month", y= "Count")+theme(plot.title= element_text(hjust=0.5), axis.text.x = element_text(angle=90, hjust=1, vjust=0.3), legend.position="none")+   geom_text(aes(label = ..count..), stat = "count", vjust = -0.3, colour = "black")
+      })}
+)   
+
+```
+
+### Analysis
+- The bar plot displays the amount of vacation bookings per month for the entire data set. Just by looking at the graph, the majority of bookings seem to be in the prime vacation months (June, July, August). However, the disparity between vacation months and non-vacation months is very little. Apart from the winter months, the distribution of vacation bookings across all the months is quite even. With the data used, the article does appear to be right in that you should book in the non-vacation months as the majority of people book during the prime vacation months. 
+
+
+## Lead Time{.tabset}
+### Plot
+```{r}
+# Creating a shiny plot using sliderinput() for sliders
+
+inputPanel(
+  sliderInput("n_breaks", label = "Number of bins:",
+              min = 10, max = 30, value = 20, step = 5),
+
+)
+
+renderPlot({
+ggplot(hotel2) + geom_histogram(aes(x = lead_time), bins = as.numeric(input$n_breaks), fill = 'orange')+labs(x = 'Lead Time', y = 'Frequency', title = 'Histogram of Lead Time')+  theme(plot.title=element_text(hjust=0.5))
+
+})
+
+
+```
+
+### Analysis
+- From this histogram we can see the most common occurrences of lead time for vacation reservations. The article says that the best time to book a vacation is as close as possible to check in date, and this holds true for this set of vacation reservations. There is a heavy right skew in the graph indicating that the majority of people book closer to their move in date than most. 
+
+## Average Daily Rate{.tabset}
+### Plot 1
+```{r, warning=FALSE, message=FALSE}
+# Using ggplot to create a boxplot
+
+ggplot(hotel2, aes(x=hotel, y=adr, fill=hotel))+geom_boxplot()+labs(x="Hotel Type", y="ADR", title="ADR by Hotel")+theme(plot.title=element_text(hjust=0.5),axis.text.x = element_text(angle=90, hjust=1, vjust=0.3), legend.position="none")+ylim(0, 750)
+```
+
+### Analysis 2
+- Looking at the ADR between city and resort hotels, we can see that the rates between the two are very similar.
+
+
+### Plot 2
+```{r, warning=FALSE, message=FALSE}
+ggplot(hotel2, aes(x=group, y=adr, fill = group))+geom_boxplot()+labs(x="Group", y="ADR", title="ADR by Vacation Season")+theme(plot.title=element_text(hjust=0.5), legend.position="none")+ylim(0, 750)
+```
+
+
+### Analysis 2
+- Finally, I wanted to see if there was a significant difference in ADR for prime vacation times versus non-vacation times. Looking at this boxplot, the prime winter months do have a lower rate when compared to the non-prime months and the prime summer months. This makes sense in comparison to the prime summer months, as more people travel during the summertime. It was surprising to see that the winter vacation months have a lower ADR than the non-prime vacation months. This could be due to a various of factors, but as seen earlier (check in month barplot) there are more people traveling during the non-vacation months than the prime winter months. 
+
+
+# Conclusion
+- Overall, the dataset explained the conclusions of the article quite well. We found that the majority of people book closer to their move in date (low lead time), which is what the article recommended. We also saw that the majority of people go on vacation during the prime vacation months, where the ADR are higher than other months. This also is in tune with the article as the article says to book in the off-season months when the rates are significantly lower. 
